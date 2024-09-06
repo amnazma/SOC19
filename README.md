@@ -14,6 +14,8 @@
 |Ubuntu 22.04 iso | https://releases.ubuntu.com/jammy/ubuntu-22.04.4-live-server-amd64.iso | Ubuntu Server Edition|
 |Windows Forensics Challenge File | https://drive.google.com/file/d/1MXXTfyCOSAd-nMBRhlOydiAgWGn4vOzZ/view?usp=sharing| | 
 |Eric Zimmerman Tools |https://drive.google.com/file/d/1Bp-ZaglFuCXSavU2eteER_2T0oH-xGPg/view?usp=sharing | |
+|Microsoft Sysinternals | https://download.sysinternals.com/files/SysinternalsSuite.zip | | 
+|Obsidian | https://github.com/obsidianmd/obsidian-releases/releases/download/v1.6.7/Obsidian-1.6.7.exe | | 
 
 
 
