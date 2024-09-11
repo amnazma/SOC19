@@ -4,7 +4,7 @@ index=botsv2 sourcetype=stream:http earliest=0  http_user_agent="Mozilla5.0 (Win
 
 index=botsv2 sourcetype=stream:http earliest=0 
 | stats count BY http_user_agent
-| search count  100
+| search count < 100
 
 /* Boolean Expressions*/
 
