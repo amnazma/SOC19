@@ -62,7 +62,7 @@ index=botsv2 sourcetype="access_combined" earliest=0
 |eval upper_bound = avg + 3 * stdev
 |where len > upper_bound or len < lower_bound 
 | stats values(clientip) as clientip , values(host) as host, count by useragent 
-| sourt count 
+| sort count 
 
 
 
