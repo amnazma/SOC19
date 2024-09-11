@@ -1,0 +1,172 @@
+index=botsv2 sourcetype=stream:http earliest=0 "Mozilla"
+
+index=botsv2 sourcetype=stream:http earliest=0  http_user_agent="Mozilla5.0 (Windows NT 6.333; Win64; x64) AppleWebKit537.36 (KHTML, like Gecko) Chrome59.0.3071.115 Safari537.36"
+
+index=botsv2 sourcetype=stream:http earliest=0 
+| stats count BY http_user_agent
+| search count  100
+
+/* Boolean Expressions*/
+
+
+
+index=botsv2 sourcetype=stream:http earliest=0 http_method=GET OR http_method=POST
+
+index=botsv2 sourcetype=stream:http earliest=0  NOT http_method=GET
+
+index=botsv2 sourcetype=stream:http earliest=0  NOT http_method=GET http_method=POST
+
+index=botsv2 sourcetype=stream:http earliest=0  http_method=GET OR http_method=POST AND http_user_agent="Microsoft BITS7.5"
+
+index=botsv2 sourcetype=stream:http earliest=0  http_method=GET OR (http_method=POST AND http_user_agent="Microsoft BITS7.5)"
+
+
+/*Wildcards*/
+
+index=botsv2 sourcetype=stream:http earliest=0 flow_id="163bd883-304a-4f4e-bf93-7379bcaf66f5"
+
+index=botsv2 sourcetype=stream:http earliest=0 flow_id="*163bd883"
+
+index=botsv2sourcetype=stream:http earliest=0 flow_id="7379bcaf66f5*"
+
+/*Ranges*/
+
+index=botsv2 sourcetype=stream:http earliest=0 bytes_in < 100 bytes_in > 1000
+
+index=botsv2 sourcetype=stream:http earliest=0  src_ip="10.0.2.0/24"
+
+
+
+### Create Dashboard for Splunk
+
+
+
+index=botsv2 sourcetype="access_combined" earliest=0 
+| stats count by useragent
+
+index=botsv2 sourcetype="access_combined" earliest=0
+| timechart count by useragent
+
+index=botsv2 sourcetype="access_combined" earliest=0
+| eval len = len(useragent)
+|stats max(len)
+
+index=botsv2 sourcetype="access_combined" earliest=0
+| eval len = len(useragent)
+|stats min(len)
+
+index=botsv2 sourcetype="access_combined" earliest=0 
+|eval len = len(useragent)
+|eventstats avg(len) as avg,stdev(len) as stdev
+|eval lower_bound = avg - 3 * stdev
+|eval upper_bound = avg + 3 * stdev
+|where len > upper_bound or len < lower_bound 
+| stats values(clientip) as clientip , values(host) as host, count by useragent 
+| sourt count 
+
+
+
+### Building Firewall Dashboard
+
+
+
+index=botsv2 sourcetype="pan:traffic" src_ip dest_ip
+| stats count BY src_ip
+| sort - count
+
+index=botsv2 sourcetype="pan:traffic" src_ip_tok$ dest_ip
+| stats count BY dest_ip
+| sort - count
+
+index=botsv2 sourcetype="pan:traffic" src_ip dest_ip
+| timechart count BY dest_port
+
+index=botsv2 sourcetype="pan:traffic" $src_ip dest_ip
+| stats count BY src_interface dest_interface
+| sort - count
+
+
+### More Complex Scenarios
+
+
+ 
+index=botsv2 sourcetype=stream:http earliest=0
+| eval isip = if(match(site,"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"),1,0)
+| search isip=1
+| stats count BY src_ip
+| sort -count
+
+
+Searching in stream:http
+
+index=botsv2 sourcetype=stream:http earliest=08/01/2017:00:00:00 latest=09/01/2017:00:00:00
+| eval site = replace(site,"(.*):\d+","\1")
+| search site = "uranus.frothly.local"
+
+Searching in stream:dns
+
+index=botsv2 sourcetype=stream:dns earliest=08/01/2017:00:00:00 latest=09/01/2017:00:00:00 query{}="uranus.frothly.local" 
+| rename query{} AS site
+
+Using append to join the datasets
+
+index=botsv2 sourcetype=stream:http earliest=08/20/2017:00:00:00 latest=09/01/2017:00:00:00
+| eval site = replace(site,"(.*):\d+","\1")
+| search site = "uranus.frothly.local"
+| append 
+    [search index=botsv2 sourcetype=stream:dns earliest=08/20/2017:00:00:00 latest=09/01/2017:00:00:00 query{}="uranus.frothly.local" 
+    | rename query{} AS site]
+| stats count BY src_ip site
+
+Using OR to combine the datasets
+
+index=botsv2 (sourcetype=stream:http site="uranus.frothly.local:8014") OR (sourcetype=stream:dns query{}="uranus.frothly.local") earliest=08/20/2017:00:00:00 latest=09/01/2017:00:00:00
+| eval site = replace(site,"(.*):\d+","\1")
+| eval dest_host = if(sourcetype=="stream:http",site,'query{}')
+| search dest_host="uranus.frothly.local" 
+| stats count values(sourcetype) AS sourcetype BY src_ip, dest_host
+| sort -count
+
+
+/*Finding the Rarest Countries in Connection Events*/
+
+index=botsv2 sourcetype=access_combined earliest=0
+| iplocation clientip
+| geostats globallimit=0 count BY City
+
+index=botsv2 sourcetype=access_combined earliest=0
+| iplocation clientip
+| rare Country
+| search percent < 1
+
+/*First Time Logins of User Accounts*/
+
+index=botsv2 sourcetype=wineventlog OR sourcetype=xmlwineventlog signature_id=4624 NOT user="ANONYMOUS LOGON" earliest=08/01/2017:00:00:00 latest=08/25/2017:00:00:00
+| stats earliest(_time) AS earliest latest(_time) AS latest BY user, dest
+| eval deadline = strptime("08/25/2017:00:00:00", "%m/%d/%Y:%H:%M:%S")
+| where earliest >= relative_time(deadline,"-1d@d")
+| convert ctime(earliest) AS earliest
+| table user, dest, earliest
+
+/*Failed and Successful Login Attempts*/
+
+index=botsv2 sourcetype=wineventlog signature_id IN (4624, 4625) NOT user="*$" earliest=1
+| streamstats time_window=1h count(eval(signature_id=4625)) AS failed_count count(eval(signature_id=4624)) AS success_count BY user, dest
+| table _time, failed_count, success_count, user, dest
+
+index=botsv2 sourcetype=wineventlog signature_id IN (4624, 4625) NOT user="*$" earliest=1
+| streamstats time_window=1h count(eval(signature_id=4625)) AS failed_count count(eval(signature_id=4624)) AS success_count BY user, dest
+| where failed_count > 2 AND success_count > 0
+| stats max(failed_count) AS max_failed_count BY user, dest
+
+/*High Network Bandwidth Consumption*/
+
+index=botsv2 sourcetype=pan:traffic earliest=1
+| bin span=1d _time
+| stats sum(bytes_out) AS bytes_out BY _time, src_ip, dest_ip
+| eventstats avg(bytes_out) AS avg, stdev(bytes_out) AS stdev
+| eval upper_bound = avg + 2 * stdev
+| where bytes_out > upper_bound
+| eval mbytes_out = bytes_out/1024/1024, upper_bound_mbytes = upper_bound/1024/1024
+| fields _time, src_ip, dest_ip, mbytes_out, upper_bound_mbytes
+| search NOT dest_ip IN ("52.40.10.231","23.218.119.50")
